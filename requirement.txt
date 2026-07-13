@@ -1,0 +1,10 @@
+openbb
+openbb-federal-reserve
+pandas
+numpy
+matplotlib
+scikit-learn
+statsmodels
+streamlit
+plotly
+pyarrow

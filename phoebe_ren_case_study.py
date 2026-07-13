@@ -674,7 +674,6 @@ class Butterfly:
         """
         w_fn = self.solve_factor_neutral()
         w_dv = self.solve_dv01_neutral()
-        belly_mm = 100.0   # or whatever the user passes in
         E_fn = self._factor_exposures(w_fn.values * belly_mm)
         E_dv = self._factor_exposures(w_dv.values * belly_mm)
         pcs = list(self.loadings.columns)
@@ -769,7 +768,7 @@ class MeanReversionStrategy:
         S = s3_daily.cumsum()
 
         # Butterfly yield spread (sanity twin): weighted sum of yield levels
-        # Uses signed weights (belly is negative)
+        # Uses signed weights (belly is positive)
         spread_bps = self.yields_bps[tenors].mul(self.weights.values, axis=1).sum(axis=1)
 
         # Trailing z-score with strict no-lookahead:
@@ -794,7 +793,7 @@ class MeanReversionStrategy:
 
         Returns
         -------
-        dict with:
+        pd.Serieswith:
           adf_stat, adf_pvalue     : Dickey-Fuller test (H0: unit root)
           ar1_beta                 : coefficient in dS_t = alpha + beta*S_{t-1} + e
           half_life_days           : ln(2) / ln(1/phi) where phi = 1 + beta

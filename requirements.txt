@@ -1,0 +1,8 @@
+openbb
+pandas
+numpy
+matplotlib
+scikit-learn
+statsmodels
+streamlit
+plotly

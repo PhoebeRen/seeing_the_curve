@@ -6,7 +6,7 @@ Usage:
     streamlit run demo.py
 
 Assumes all classes (TreasuryCurveData, TreasuryPCA, Butterfly,
-MeanReversionStrategy) live in seeing_the_curve.py in the same directory.
+MeanReversionStrategy) live in phoebe_ren_case_study.py in the same directory.
 """
 
 import streamlit as st
@@ -15,11 +15,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from seeing_the_curve import (
-    TreasuryCurveData,
-    TreasuryPCA,
-    Butterfly,
-    MeanReversionStrategy,
+from phoebe_ren_case_study import (
     TreasuryCurveData,
     TreasuryPCA,
     Butterfly,
@@ -83,7 +79,7 @@ def load_data():
 if run_btn or "results" in st.session_state:
 
     yields, changes = load_data()
-    yields_bps  = yields  * 100
+    yields_bps  = yields * 100
     changes_bps = changes * 10000
 
     # ── PCA (full sample for display, IS for strategy) ───────────────────

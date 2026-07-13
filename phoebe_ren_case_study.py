@@ -1129,7 +1129,7 @@ def main() -> None:
     print(f'\n────────────────Task 2────────────────')
     # Work in basis points so eigenvalues have interpretable scale.
     yields_bps = yields * 100
-    changes_bps = changes * 10_000
+    changes_bps = changes * 10000
     max_components = min(changes_bps.shape)
  
     # 1. Full-sample PCA — the reference for sign alignment

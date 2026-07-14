@@ -53,7 +53,7 @@ st.caption("U.S. Treasury Curve PCA & Factor-Neutral Relative-Value Strategy")
 
 st.sidebar.header("Parameters")
 
-lookback = st.sidebar.slider("Z-score lookback (days)", 20, 120, 60, step=5)
+lookback = st.sidebar.slider("Z-score lookback (days)", 20, 180, 60, step=5)
 entry_z  = st.sidebar.slider("Entry |z| threshold", 1.0, 3.0, 2.0, step=0.1)
 exit_z   = st.sidebar.slider("Exit |z| threshold",  0.0, 1.5, 0.5, step=0.1)
 cost_bps = st.sidebar.slider("Transaction Cost in bps (bid/ask spread)",  0.1, 1.0, 0.2, step=0.05)
@@ -545,6 +545,72 @@ if run_btn or "results" in st.session_state:
             "However gross P&L is near zero — transaction costs dominate "
             "even at tight bid-ask assumptions."
         )
+
+        st.subheader("Not Production Ready")
+        st.caption(
+            "The strategy uses IS-window PCA loadings and butterfly "
+            "weights throughout. In production, loading drift between periods "
+            "causes silent factor exposure — quantified below."
+        )
+
+        # ── Fit OOS PCA for comparison and stale-exposure calc ───────────
+        pca_oos = TreasuryPCA(n_components=3).fit(
+            changes_bps.loc[OOS_START:]
+        )
+        fly_oos_loadings = Butterfly(BUTTERFLY_TENORS, DURATIONS, pca=pca_oos)
+
+        # ── IS vs OOS PC loadings side by side ───────────────────────────
+        col_is_load, col_oos_load = st.columns(2)
+        with col_is_load:
+            st.markdown(f"**In-sample loadings (through {IS_END})**")
+            st.dataframe(
+                pca_is.loadings_.round(4),
+                width="stretch",
+                height=245,
+            )
+        with col_oos_load:
+            st.markdown(f"**Out-of-sample loadings (from {OOS_START})**")
+            st.dataframe(
+                pca_oos.loadings_.round(4),
+                width="stretch",
+                height=245,
+            )
+
+        st.info(
+            "Loading drift between periods is exactly the risk quantified "
+            "below. Frozen IS weights no longer zero out PC1/PC2 exposure "
+            "when the true loadings shift."
+        )
+
+        st.divider()
+
+        # ── IS weights + stale exposure ──────────────────────────────────
+        
+        w_is = fly_is.solve_factor_neutral()
+        col_w, col_stale = st.columns([1, 2])
+        with col_w:
+            st.markdown("**In-sample butterfly weights (used throughout backtest)**")
+            st.dataframe(
+                w_is.round(4).to_frame("weight"),
+                width="stretch",
+                height=143,
+            )
+        with col_stale:
+            st.markdown(f"**Stale-weight residual exposure at ${belly_mm:.0f}mm belly**")
+            stale_exposure = fly_oos_loadings._factor_exposures(
+                w_is.values * belly_mm
+            )
+            stale_df = pd.DataFrame(
+                {"$/unit factor move": stale_exposure.round(2)},
+                index=["PC1 (level)", "PC2 (slope)", "PC3 (curvature)"],
+            )
+            st.dataframe(stale_df, width="stretch", height=143)
+            st.info(
+                "IS weights scored under OOS loadings. Nonzero PC1/PC2 = "
+                "unintended level and slope exposure the frozen strategy "
+                "silently carries in the OOS period."
+            )    
+
 
 else:
     st.info("Configure parameters in the sidebar and click **Run Analysis**.")

@@ -53,7 +53,7 @@ BELLY_NOTIONAL = 100.0
 IS_END       = "2023-12-31"
 OOS_START    = "2024-01-01"
 # Strategy parameters
-LOOKBACK = 60       # 60 days, ~1 quarter, several estimated half-lives
+LOOKBACK = 60      # 60 days, ~1 quarter
 ENTRY_Z  = 2      # meaningful dislocation, clears costs, adequate trade count
 EXIT_Z   = 0.5     # capture fast portion of OU decay; 1.0-sigma hysteresis
 COST_BPS = 0.2     # per-leg bid/ask on on-the-run Treasuries
@@ -457,6 +457,7 @@ class TreasuryPCA:
             self.means_ = X.mean(axis=0)
             X_input     = X - self.means_
 
+
         pca = PCA(n_components=self.n_components)
         scores = pca.fit_transform(X_input)
 
@@ -819,7 +820,11 @@ class MeanReversionStrategy:
             mr_test   = "FAIL - oscillating or random walk (phi <= 0)"
         else:
             half_life = np.log(2) / np.log(1 / phi)
-            mr_test   = f"PASS - mean reverting, half-life = {half_life:.1f} days"
+            if adf_p <= 0.1:
+                mr_test   = f"PASS - mean reverting, half-life = {half_life:.1f} days"
+            else:
+                mr_test   = f"Weak PASS - mean reversion not statistically significant, half-life = {half_life:.1f} days"
+
  
         return pd.Series({
             "adf_stat":       round(adf_stat,  3),
@@ -1195,6 +1200,11 @@ def main() -> None:
 
     # 1. Fit PCA & solve butterfly weights on in-sample data only 
     pca_is = TreasuryPCA(n_components=3).fit(changes_bps.loc[is_slice])
+    ##Force the belly's PC3 loading to be negative, wings' PC3 to be positive
+    ##Each eigenvector's sign is independent — flipping PC3 doesn't affect PC1 or PC2 at all
+    if pca_is.loadings_.loc["7Y", "PC3"] > 0:
+        pca_is.loadings_["PC3"] *= -1
+        pca_is.scores_["PC3"]   *= -1
     fly_is = Butterfly(BUTTERFLY_TENORS, DURATIONS, pca=pca_is)
  
     strat = MeanReversionStrategy(
@@ -1241,13 +1251,23 @@ def main() -> None:
     # 4. Bridge back to Task 2: stale-weight neutrality drift ─────────────────
     # The in-sample weights zero out PC1/PC2 exposure under in-sample loadings. 
     # Under out-of-sample loadings they no longer do — quantify the residual in dollars.
+    # Show what strategy is trained on
+    print("\nStale Weights Diagnostics:")
+    print(f"\nIn-sample loadings (through {IS_END}):")
+    print(pca_is.loadings_.round(4))
+
     pca_oos          = TreasuryPCA(n_components=3).fit(changes_bps.loc[oos_slice])
     fly_oos_loadings = Butterfly(BUTTERFLY_TENORS, DURATIONS, pca=pca_oos)
-    w_is             = fly_is.solve_factor_neutral().values
+    w_is             = fly_is.solve_factor_neutral()
+
+    print(f"\nOut-of-sample loadings (from {OOS_START}):")
+    print(pca_oos.loadings_.round(4))
+    print(f"\nIn-sample butterfly weights:")
+    print(w_is.round(4))
  
-    stale_exposure   = fly_oos_loadings._factor_exposures(w_is * BELLY_NOTIONAL)  # $/unit factor move
-    print("\nStale-weight residual exposure:")
-    print("IS weights scored under OOS loadings ($/unit factor move):")
+    stale_exposure   = fly_oos_loadings._factor_exposures(w_is.values * BELLY_NOTIONAL)  # $/unit factor move
+    print(f"\nStale-weight residual exposure at ${BELLY_NOTIONAL:.0f}mm belly ($/unit):")
+    print("In-sample weights scored under Out-of-sample loadings:")
     print(pd.Series(stale_exposure, index=["PC1", "PC2", "PC3"]).round(2))
 
     plt.show()  # show all plots at the end

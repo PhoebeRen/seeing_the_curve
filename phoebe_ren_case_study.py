@@ -7,6 +7,7 @@ from openbb import obb
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from statsmodels.tsa.stattools import adfuller
+import statsmodels.api as sm
 matplotlib.use("Qt5Agg")
 
 
@@ -541,6 +542,35 @@ class TreasuryPCA:
             title += f" — {title_suffix}"
         plt.title(title)
         fig.tight_layout()
+
+    # ── Regression to check factor significance ───────────────────────────────────────────────────────────
+    def regression_check(self, changes: pd.DataFrame) -> pd.DataFrame:
+        """
+        Regress each tenor's daily yield changes on the PCA scores.
+        Returns a DataFrame with columns:
+        - R_squared : R² of the regression
+        - p_PC1     : p-value for PC1 coefficient
+        - p_PC2     : p-value for PC2 coefficient
+        - p_PC3     : p-value for PC3 coefficient
+        """
+        if self.scores_ is None:
+            raise RuntimeError("Call fit() before regression_check().")
+
+        changed_aligned = changes.loc[self.scores_.index]
+        X = self.scores_.values
+        results = {}
+        for tenor in self.tenors_:
+            y = changed_aligned[tenor].values
+            model = sm.OLS(y, X).fit()
+            results[tenor] = {
+                "R_squared":  model.rsquared,
+                "Adj_R_squared": model.rsquared_adj,
+                "p_value_PC1":      model.pvalues[1],
+                "p_value_PC2":      model.pvalues[2],
+                "p_value_PC3":      model.pvalues[3],
+            }
+        return pd.DataFrame(results)
+
 
     # ── Summary ──────────────────────────────────────────────────────────────
 
@@ -1171,6 +1201,11 @@ def main() -> None:
         axis=1,
     )
     print("\nVariance shares across periods:\n", variance_compare)
+
+    # 5. Regression to validate 3-factor model
+    print("\n3-factor regression validation:")
+    regression_results = pca_full.regression_check(changes_bps)
+    print(regression_results.round(4))
 
     # Task 3: Factor-neutral butterfly 
     print(f'\n────────────────Task 3────────────────')

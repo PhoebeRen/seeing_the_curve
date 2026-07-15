@@ -56,7 +56,7 @@ st.sidebar.header("Parameters")
 lookback = st.sidebar.slider("Z-score lookback (days)", 20, 180, 60, step=5)
 entry_z  = st.sidebar.slider("Entry |z| threshold", 1.0, 3.0, 2.0, step=0.1)
 exit_z   = st.sidebar.slider("Exit |z| threshold",  0.0, 1.5, 0.5, step=0.1)
-cost_bps = st.sidebar.slider("Transaction Cost in bps (bid/ask spread)",  0.1, 1.0, 0.2, step=0.05)
+cost_bps = st.sidebar.slider("Transaction Cost in bps (bid/ask spread) per leg",  0.1, 1.0, 0.2, step=0.05)
 belly_mm = st.sidebar.number_input("Belly notional ($mm)", value=100.0, step=10.0)
 
 run_btn = st.sidebar.button("Run Analysis", type="primary", width='stretch')
@@ -201,6 +201,12 @@ if run_btn or "results" in st.session_state:
             pca_full.loadings_[["PC1","PC2","PC3", 'PC4', 'PC5', 'PC6']].round(4),
             width='stretch'
         )   
+
+        #Regression Validation
+        st.caption("3-Factor Regression Validation")
+        regression_results = pca_full.regression_check(changes_bps)
+        st.dataframe(regression_results.round(4))
+        st.info("The regression results show the significance of each factor in explaining the yield changes.")
 
         # Fit sub-period PCAs aligned to full sample signs
         pre_changes  = changes_bps.loc[changes_bps.index <  REGIME_SPLIT]
